@@ -32,7 +32,10 @@ class FileDownloader(threading.Thread):
     def run(self):
         try:
             thread_id = threading.get_ident()
-            response = requests.get(self.url, proxies=self.proxies, stream=True)
+            if self.use_proxy:
+                response = requests.get(self.url, proxies=self.proxies, stream=True)
+            else:
+                response = requests.get(self.url, stream=True)
             print(f"get connection response: {response}")
 
             response.raise_for_status()
@@ -48,7 +51,10 @@ class FileDownloader(threading.Thread):
                 # the self.save_path here is only a dir, so it needs to add the zip filename(already added .zip )
                 # with open(self.save_path + self.url.split('/')[-1] , 'wb') as file:
                 with open(self.save_path, 'wb') as file:
-                    response = requests.get(self.url, proxies=self.proxies, stream=True)
+                    if self.use_proxy:
+                        response = requests.get(self.url, proxies=self.proxies, stream=True)
+                    else:
+                        response = requests.get(self.url, stream=True)
                     temp_percentage = 0
                     for data in response.iter_content(chunk_size=1024):
                         if self.stop_event.is_set():
@@ -279,17 +285,20 @@ class FileDownloaderApp(tk.Frame):
         self.root.after(sleep_time, self.process_message)
 
     # main download thread
-    def download_files(self, file_urls, use_proxy, proxies, save_path, my_queue, stop_event, l, file_company_list):
+    def download_files(self, file_urls, use_proxy, proxies, save_path, my_queue, stop_event, num_cmpy, file_company_list):
         self.process_message()
 
         for i, url in enumerate(file_urls):
             try:
                 self.update_log(f'\nMain Download Thread: Creating FileDownloader for {url.split("/")[-1]}')
-                if l==0:
+                if num_cmpy == 0:
                     downloader = FileDownloader(url, use_proxy, proxies, f"{save_path}/{url.split('/')[-1]}", my_queue, stop_event)
                 else:
                     downloader = FileDownloader(url, use_proxy, proxies, f"{save_path}/{file_company_list[i]}.zip", my_queue, stop_event)
-                downloader.setDaemon(True)
+                # # For python 3.10 earlier
+                # downloader.setDaemon(True)
+                # For python 3.10 above
+                downloader.daemon = True
                 downloader.start()
                 self.downloader_list.append(downloader)
 
@@ -415,18 +424,18 @@ class FileDownloaderApp(tk.Frame):
         # check and put company name into the save path name
         
         m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
-        l = len(m)
+        num_cmpy = len(m)
         # print(f"self.textbox_cmpy_names.get(): {m}")
-        if l == 1 and m[0] == '':
-            l = 0
+        if num_cmpy == 1 and m[0] == '':
+            num_cmpy = 0
         
-        if file_len==l and l!=0:
+        if file_len==num_cmpy and num_cmpy!=0:
             print(f"file_len==l, {file_len}")
             self.file_company_list = ['']* file_len
             for i in range(file_len):
                 self.file_company_list[i] = f"{self.file_list[i]}-{self.company_list[i]}"
         else:
-            l = 0
+            num_cmpy = 0
 
         # Set proxy setting
         self.use_proxy = bool( self.use_proxy_checkbox_var.get() )
@@ -460,9 +469,10 @@ class FileDownloaderApp(tk.Frame):
         download_thread = threading.Thread(target=self.download_files,
                                            args=(self.file_urls, self.use_proxy, self.proxies, 
                                                  self.save_path, self.queue, self.stop_event, 
-                                                 l, self.file_company_list ) 
+                                                 num_cmpy, self.file_company_list ) 
                                            )
-        download_thread.setDaemon(True)
+        # # For python 3.10 earlier
+        # download_thread.setDaemon(True)
         # For python 3.10 above
         download_thread.daemon = True
         download_thread.start()
@@ -526,8 +536,6 @@ class FileDownloaderApp(tk.Frame):
             fp_cfg.write(f"use_proxy\t= {str(bool(self.use_proxy_checkbox_var.get()))}\n")
             fp_cfg.write(f"http_proxy\t= {self.textbox_http_proxy.get()}\n")
             fp_cfg.write(f"https_proxy\t= {self.textbox_https_proxy.get()}\n")
-            # fp_cfg.write(f"filenames\t= {self.textbox_filenames.get('1.0', tk.END).strip()}\n")
-            # fp_cfg.write(f"company_names\t= {self.textbox_cmpy_names.get('1.0', tk.END).strip()}\n")
         
         self.stop_event.set()
 
@@ -565,8 +573,6 @@ class FileDownloaderApp(tk.Frame):
             "use_proxy": "False",
             "http_proxy": "",
             "https_proxy": "",
-            # "company_names": "",
-            # "filenames": ""
         }
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r') as fp_cfg:
@@ -579,22 +585,6 @@ class FileDownloaderApp(tk.Frame):
                         var_name, var_value = line.split('=')
                         var_name, var_value = var_name.strip(), var_value.strip()
                         self.app_config[var_name] = var_value
-                    # if line.startswith("save_path"):
-                    #     save_path = line.split('=')[1].strip()
-                    #     # self.textbox_savepath.delete(0, tk.END)
-                    #     # self.textbox_savepath.insert("end", save_path)
-                    # elif line.startswith("website_url"):
-                    #     website_url = line.split('=')[1].strip()
-                    #     # self.textbox_url.delete(0, tk.END)
-                    #     # self.textbox_url.insert("end", website_url)
-                    # elif line.startswith("company_names"):
-                    #     company_names = line.split('=')[1].strip()
-                    #     self.textbox_cmpy_names.delete("1.0", tk.END)
-                    #     self.textbox_cmpy_names.insert("end", company_names)
-                    # elif line.startswith("filenames"):
-                    #     filenames = line.split('=')[1].strip()
-                    #     self.textbox_filenames.delete("1.0", tk.END)
-                    #     self.textbox_filenames.insert("end", filenames)
         else:
             self.loading_log_text = f"During program loadinging: No config file found.\n\n"
 
