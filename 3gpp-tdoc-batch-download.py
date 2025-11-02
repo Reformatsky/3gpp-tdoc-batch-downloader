@@ -563,8 +563,8 @@ class FileDownloaderApp(tk.Frame):
             "save_path": "./Tdocs_download_dir",
             "website_url": "https://www.3gpp.org/ftp/tsg_ran/WG4_Radio/TSGR4_117/Docs",
             "use_proxy": "False",
-            # "http_proxy": "",
-            # "https_proxy": "",
+            "http_proxy": "",
+            "https_proxy": "",
             # "company_names": "",
             # "filenames": ""
         }
@@ -629,7 +629,7 @@ class FileDownloaderApp(tk.Frame):
         else:
             self.use_proxy_checkbox_var.set(0)
         
-        self.label_http_proxy = tk.Label(self.root, text="HTTP Proxy:", font=("Arial", 11, 'bold'))
+        self.label_http_proxy = tk.Label(self.root, text="HTTP Proxy:", font=("Arial", 11))
         self.label_http_proxy.grid(row=5, column=0, columnspan=1, padx=5, pady=1, sticky='w')
         self.textbox_http_proxy = tk.Entry(self.root, width=15, font=("Consolas", 12))
         self.textbox_http_proxy.grid(row=5, column=1, columnspan=3, padx=5, pady=1, sticky='ew')
