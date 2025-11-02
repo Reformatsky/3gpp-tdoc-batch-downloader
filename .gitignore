@@ -1,1 +1,10 @@
 .idea/
+.vscode/
+__pycache__/
+Tdocs_download_dir/
+*.pyc
+app_config.ini
+desktop.ini
+filenames.txt
+old-simple-tdoc-batch-download.py
+simple-tdoc-batch-download.py
