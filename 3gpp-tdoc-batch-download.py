@@ -14,9 +14,11 @@ sleep_time = 10
 
 
 class FileDownloader(threading.Thread):
-    def __init__(self, url, save_path, qu, stop_event):
+    def __init__(self, url, use_proxy, proxies, save_path, qu, stop_event):
         super(FileDownloader, self).__init__()
         self.url = url
+        self.use_proxy = use_proxy
+        self.proxies = proxies
         self.save_path = save_path
         self.queue = qu
         self.download_successful = False
@@ -30,7 +32,7 @@ class FileDownloader(threading.Thread):
     def run(self):
         try:
             thread_id = threading.get_ident()
-            response = requests.get(self.url, stream=True)
+            response = requests.get(self.url, proxies=self.proxies, stream=True)
             print(f"get connection response: {response}")
 
             response.raise_for_status()
@@ -46,7 +48,7 @@ class FileDownloader(threading.Thread):
                 # the self.save_path here is only a dir, so it needs to add the zip filename(already added .zip )
                 # with open(self.save_path + self.url.split('/')[-1] , 'wb') as file:
                 with open(self.save_path, 'wb') as file:
-                    response = requests.get(self.url, stream=True)
+                    response = requests.get(self.url, proxies=self.proxies, stream=True)
                     temp_percentage = 0
                     for data in response.iter_content(chunk_size=1024):
                         if self.stop_event.is_set():
@@ -101,7 +103,7 @@ class FileDownloaderApp(tk.Frame):
         
         self.root = master
         self.root.withdraw()
-        self.root.title("Baicells 3GPP TDocs Downloader")
+        self.root.title("3GPP TDocs Batch Downloader")
         # self.root.configure(bg="lightgray")
 
         # # set progress bar
@@ -111,8 +113,13 @@ class FileDownloaderApp(tk.Frame):
 
         self.contents = ""  
         self.file_list = []
+        self.company_list = []
         self.file_urls = []
         self.save_path = ""
+        self.config_file = "app_config.ini"
+        self.app_config = {}
+        self.use_proxy = False
+        self.proxies = { 'http_proxy': '', 'https_proxy': '' }
         self.downloader_list = []
         self.queue = queue.Queue()
         self.successful_downloads = []
@@ -121,7 +128,9 @@ class FileDownloaderApp(tk.Frame):
         self.progress_per_file = 0
         # self.progress_per_file_hold_flag = False
         self.stop_event = threading.Event()
+        self.loading_log_text = ''
 
+        self.read_config()
         self.layout()
         self.set_screen()
         self.root.deiconify()
@@ -137,8 +146,10 @@ class FileDownloaderApp(tk.Frame):
         self.root.geometry(f"{width}x{height}+{int(x)}+{int(y)}")         
         
     def fit_window_size(self):
+        # Update to guarantee minimal window size
+        self.root.minsize(540, 660)
         # Update the window size to fit all components
-        self.root.update()     
+        self.root.update()
         self.root.resizable(0, 0)
 
     def check_n_load_from_txt(self):
@@ -186,6 +197,26 @@ class FileDownloaderApp(tk.Frame):
             self.label_var1.set(text)
             self.update_log(text)
         self.textbox_filenames.edit_modified(False)  # Reset the modified flag for text widget!
+
+    def on_text_insert_companies(self, event):
+        # the flag below is to prevent this function being called twice
+        flag = self.textbox_cmpy_names.edit_modified()
+        if flag:
+            self.current_line = self.textbox_cmpy_names.index("insert").split(".")[0]
+            print(f"line {self.current_line}")
+            # self.check_if_text_repeated("download_list")
+            self.textbox_cmpy_names.see(f"{self.current_line}.0")
+
+            l = len(self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n"))
+            m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
+            print(f"self.textbox_cmpy_names.get(): {m}")
+            if l == 1 and m[0] == '':
+                l = 0
+            # text = f"-- #{l} files are selected."
+            # # print(text)
+            # self.label_var1.set(text)
+            # self.update_log(text)
+        self.textbox_cmpy_names.edit_modified(False)  # Reset the modified flag for text widget!
 
     def update_label(self):
         try:
@@ -248,12 +279,16 @@ class FileDownloaderApp(tk.Frame):
         self.root.after(sleep_time, self.process_message)
 
     # main download thread
-    def download_files(self, file_urls, save_path, my_queue, stop_event):
+    def download_files(self, file_urls, use_proxy, proxies, save_path, my_queue, stop_event, l, file_company_list):
         self.process_message()
-        for url in file_urls:
+
+        for i, url in enumerate(file_urls):
             try:
                 self.update_log(f'\nMain Download Thread: Creating FileDownloader for {url.split("/")[-1]}')
-                downloader = FileDownloader(url, f"{save_path}/{url.split('/')[-1]}", my_queue, stop_event)
+                if l==0:
+                    downloader = FileDownloader(url, use_proxy, proxies, f"{save_path}/{url.split('/')[-1]}", my_queue, stop_event)
+                else:
+                    downloader = FileDownloader(url, use_proxy, proxies, f"{save_path}/{file_company_list[i]}.zip", my_queue, stop_event)
                 downloader.setDaemon(True)
                 downloader.start()
                 self.downloader_list.append(downloader)
@@ -355,6 +390,8 @@ class FileDownloaderApp(tk.Frame):
         self.progress_per_file = 0
         
         self.file_list = []
+        self.company_list=[]
+        self.file_company_list=[]
         self.successful_downloads = []
         self.failed_downloads = []
         self.downloader_list = []
@@ -369,7 +406,34 @@ class FileDownloaderApp(tk.Frame):
         self.clean_state()
         # start
         self.file_list = self.textbox_filenames.get("1.0", tk.END).strip().split("\n")
-        #  URL + filename +.zip 
+        file_len= len(self.file_list)
+
+        self.company_list = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
+        for i in range(len(self.company_list)):
+                self.company_list[i] =self.company_list[i].replace(',', '').replace(' ', '').replace('.', '').replace('(', '').replace(')', '')
+        print(self.company_list)
+        # check and put company name into the save path name
+        
+        m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
+        l = len(m)
+        # print(f"self.textbox_cmpy_names.get(): {m}")
+        if l == 1 and m[0] == '':
+            l = 0
+        
+        if file_len==l and l!=0:
+            print(f"file_len==l, {file_len}")
+            self.file_company_list = ['']* file_len
+            for i in range(file_len):
+                self.file_company_list[i] = f"{self.file_list[i]}-{self.company_list[i]}"
+        else:
+            l = 0
+
+        # Set proxy setting
+        self.use_proxy = bool( self.use_proxy_checkbox_var.get() )
+        self.proxies['http_proxy'] = self.textbox_http_proxy.get().strip()
+        self.proxies['https_proxy'] = self.textbox_https_proxy.get().strip()
+        
+        # URL + filename +.zip 
         self.file_urls = [f"{self.textbox_url.get()}/{filename}.zip" for filename in self.file_list]
         print("files are: ")
         for url in self.file_urls:
@@ -394,8 +458,13 @@ class FileDownloaderApp(tk.Frame):
         self.update_progress_bar()
 
         download_thread = threading.Thread(target=self.download_files,
-                                           args=(self.file_urls, self.save_path, self.queue, self.stop_event))
+                                           args=(self.file_urls, self.use_proxy, self.proxies, 
+                                                 self.save_path, self.queue, self.stop_event, 
+                                                 l, self.file_company_list ) 
+                                           )
         download_thread.setDaemon(True)
+        # For python 3.10 above
+        download_thread.daemon = True
         download_thread.start()
 
         print("start download button process finished.")
@@ -450,6 +519,16 @@ class FileDownloaderApp(tk.Frame):
 
     # !!! to improve the close button func
     def close_program(self):
+        # Add configuration saving here
+        with open(self.config_file, 'w') as fp_cfg:
+            fp_cfg.write(f"save_path\t= {self.textbox_savepath.get()}\n")
+            fp_cfg.write(f"website_url\t= {self.textbox_url.get()}\n")
+            fp_cfg.write(f"use_proxy\t= {str(bool(self.use_proxy_checkbox_var.get()))}\n")
+            fp_cfg.write(f"http_proxy\t= {self.textbox_http_proxy.get()}\n")
+            fp_cfg.write(f"https_proxy\t= {self.textbox_https_proxy.get()}\n")
+            # fp_cfg.write(f"filenames\t= {self.textbox_filenames.get('1.0', tk.END).strip()}\n")
+            # fp_cfg.write(f"company_names\t= {self.textbox_cmpy_names.get('1.0', tk.END).strip()}\n")
+        
         self.stop_event.set()
 
         time.sleep((sleep_time+100)/1000)
@@ -477,75 +556,149 @@ class FileDownloaderApp(tk.Frame):
         #         print("this is NOT FileDownloader object.")
 
         self.root.destroy()
+        
+    def read_config(self):
+        # Initialize config first
+        self.app_config = {
+            "save_path": "./Tdocs_download_dir",
+            "website_url": "https://www.3gpp.org/ftp/tsg_ran/WG4_Radio/TSGR4_117/Docs",
+            "use_proxy": "False",
+            "http_proxy": "",
+            "https_proxy": "",
+            # "company_names": "",
+            # "filenames": ""
+        }
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as fp_cfg:
+                lines = fp_cfg.readlines()
+                for line in lines:
+                    # Remove leading/trailing whitespace
+                    line = line.strip()
+                    if line.find('\t=') >= 0:
+                        # Set config values based on the file content
+                        var_name, var_value = line.split('=')
+                        var_name, var_value = var_name.strip(), var_value.strip()
+                        self.app_config[var_name] = var_value
+                    # if line.startswith("save_path"):
+                    #     save_path = line.split('=')[1].strip()
+                    #     # self.textbox_savepath.delete(0, tk.END)
+                    #     # self.textbox_savepath.insert("end", save_path)
+                    # elif line.startswith("website_url"):
+                    #     website_url = line.split('=')[1].strip()
+                    #     # self.textbox_url.delete(0, tk.END)
+                    #     # self.textbox_url.insert("end", website_url)
+                    # elif line.startswith("company_names"):
+                    #     company_names = line.split('=')[1].strip()
+                    #     self.textbox_cmpy_names.delete("1.0", tk.END)
+                    #     self.textbox_cmpy_names.insert("end", company_names)
+                    # elif line.startswith("filenames"):
+                    #     filenames = line.split('=')[1].strip()
+                    #     self.textbox_filenames.delete("1.0", tk.END)
+                    #     self.textbox_filenames.insert("end", filenames)
+        else:
+            self.loading_log_text = f"During program loadinging: No config file found.\n\n"
 
     # layout the UI
     def layout(self):
         # Step1. website URL label
-        self.label_url = tk.Label(self.root, text="Step①. Specify URL ↓", font=("Arial", 12, "bold"))
-        self.label_url.grid(row=0, column=0, padx=5, pady=1, sticky='w')
+        self.label_url = tk.Label(self.root, text="Step①. Specify URL ↓", font=("Arial", 11, "bold"))
+        self.label_url.grid(row=0, column=0, columnspan=2, padx=5, pady=1, sticky='w')
 
 
         # 1a. website URL
-        self.textbox_url = tk.Entry(self.root, width=55, font=("Arial", 12))
-        self.textbox_url.grid(row=1, column=0, columnspan=3, padx=5, pady=1, sticky='w')
-        self.textbox_url.insert("end", "https://www.3gpp.org/ftp/tsg_ran/WG1_RL1/TSGR1_113/Docs")
+        self.textbox_url = tk.Entry(self.root, width=15, font=("Consolas", 12))
+        self.textbox_url.grid(row=1, column=0, columnspan=3, padx=5, pady=1, sticky='nesw')
+        self.textbox_url.insert("end", self.app_config['website_url'])
         
         # Step2. save path
-        self.label_savepath = tk.Label(self.root, text="Step②. Set save path ↓", font=("Arial", 12, "bold"))
-        self.label_savepath.grid(row=2, column=0, columnspan=3, padx=5, pady=1, sticky='w')
-        self.textbox_savepath = tk.Entry(self.root, width=55, font=("Arial", 12))
-        self.textbox_savepath.grid(row=3, column=0, columnspan=2, padx=5, pady=1, sticky='w')
-        self.textbox_savepath.insert("end", "./Tdocs_download_dir")
+        self.label_savepath = tk.Label(self.root, text="Step②. Set save path ↓", font=("Arial", 11, "bold"))
+        self.label_savepath.grid(row=2, column=0, columnspan=2, padx=5, pady=1, sticky='w')
+        self.textbox_savepath = tk.Entry(self.root, width=15, font=("Consolas", 12))
+        self.textbox_savepath.grid(row=3, column=0, columnspan=3, padx=5, pady=1, sticky='nesw')
+        self.textbox_savepath.insert("end", self.app_config['save_path'])
 
+        # Step2-2. Set http proxy
+        self.label_all_proxy = tk.Label(self.root, text="(Optional) Set HTTP Proxy →", font=("Arial", 11, "bold"))
+        self.label_all_proxy.grid(row=4, column=0, columnspan=2, padx=5, pady=1, sticky='w')
+        self.use_proxy_checkbox_var = tk.IntVar()
+        self.checkbox_use_proxy = tk.Checkbutton(self.root, text="Use HTTP Proxy", variable=self.use_proxy_checkbox_var, font=("Arial", 10))
+        # Set intial value for the checkbox
+        self.checkbox_use_proxy.grid(row=4, column=2, padx=5, pady=1, sticky='e')
+        if self.app_config['use_proxy'].lower() == 'true':
+            self.use_proxy_checkbox_var.set(1)
+        else:
+            self.use_proxy_checkbox_var.set(0)
+        
+        self.label_http_proxy = tk.Label(self.root, text="HTTP Proxy:", font=("Arial", 11))
+        self.label_http_proxy.grid(row=5, column=0, columnspan=1, padx=5, pady=1, sticky='w')
+        self.textbox_http_proxy = tk.Entry(self.root, width=15, font=("Consolas", 12))
+        self.textbox_http_proxy.grid(row=5, column=1, columnspan=3, padx=5, pady=1, sticky='ew')
+        self.textbox_http_proxy.insert("end", self.app_config['http_proxy'])
+        
+        self.label_https_proxy = tk.Label(self.root, text="HTTPS Proxy:", font=("Arial", 11))
+        self.label_https_proxy.grid(row=6, column=0, columnspan=1, padx=5, pady=1, sticky='w')
+        self.textbox_https_proxy = tk.Entry(self.root, width=15, font=("Consolas", 12))
+        self.textbox_https_proxy.grid(row=6, column=1, columnspan=3, padx=5, pady=1, sticky='ew')
+        self.textbox_https_proxy.insert("end", self.app_config['https_proxy'])
+        
         # Step3. filenames
-        self.label1 = tk.Label(self.root, text="Step③. Enter file names ↓", font=("Arial", 12, "bold"))
-        self.label1.grid(row=5, column=0, columnspan=2, padx=5, pady=0, sticky='nw')
+        # self.label1 = tk.Label(self.root, text="Step③. Enter file names ↓ and company name ↓ (optional)", font=("Arial", 11, "bold"))
+        self.label1 = tk.Label(self.root, text="Step③. Enter file names ↓", font=("Arial", 11, "bold"))
+        self.label1.grid(row=7, column=0, columnspan=3, padx=5, pady=0, sticky='nw')
         self.label1a = tk.Label(self.root, text="*Note: Use 'enter' to separate filenames.")
-        self.label1a.grid(row=6, column=0, columnspan=2, padx=5, pady=0, sticky='nw')
+        self.label1a.grid(row=8, column=0, columnspan=2, padx=5, pady=0, sticky='nw')
 
         # still step3, file names to be downloaded
-        self.textbox_filenames = ScrolledText(self.root, height=7, width=13, wrap=tk.WORD, font=("Arial", 12))
-        self.textbox_filenames.grid(row=7, column=0, padx=5, pady=1, sticky='nw')
+        self.textbox_filenames = ScrolledText(self.root, height=8, width=13, wrap=tk.WORD, font=("Consolas", 12))
+        self.textbox_filenames.grid(row=9, column=0, padx=5, pady=1, sticky='nw')
         # self.textbox_filenames.insert("end", "R1-2305660"+'\n'+"R1-2305896")
 
+        # still step3, company names of the files to be downloaded
+        self.textbox_cmpy_names = ScrolledText(self.root, height=8, width=20, wrap=tk.WORD, font=("Consolas", 12))
+        self.textbox_cmpy_names.grid(row=9, column=1, padx=5, pady=1, sticky='nw')
 
-        # 4. failed file names  Row 0
-        self.status_label_files_failed = tk.Label(self.root, text="Failed files:    ",
-                                                  font=("Arial", 12, "bold"))
-        self.status_label_files_failed.grid(row=6, column=1, padx=5, pady=1, sticky='ne')
 
-        self.textbox_failed_files = ScrolledText(self.root, height=7, width=13, wrap=tk.WORD,
-                                                 bg="lightgray", font=("Arial", 12))
-        self.textbox_failed_files.grid(row=7, column=1, padx=5, pady=1, sticky='ne')
+        # Step 3-2. failed file names Row 0
+        self.status_label_files_failed = tk.Label(self.root, text="Failed files:\t",
+                                                  font=("Arial", 11, "bold"))
+        self.status_label_files_failed.grid(row=8, column=2, padx=5, pady=1, sticky='ne')
+
+        self.textbox_failed_files = ScrolledText(self.root, height=8, width=15, wrap=tk.WORD,
+                                                 bg="lightgray", font=("Consolas", 12))
+        self.textbox_failed_files.grid(row=9, column=2, padx=5, pady=1, sticky='ne')
         self.textbox_failed_files.insert("end", "")
 
-        # 4. button for download
-        self.button_download = tk.Button(self.root, text="Step④. Download", fg="#3B3BFF",
-                                         font=("Arial", 12, "bold"), width=15,
+
+        # Step 4. button for download
+        # self.button_download = tk.Button(self.root, text="Step④. Download", fg="#3B3BFF",
+        self.button_download = tk.Button(self.root, text="Start Download", fg="#3B3BFF",
+                                         font=("Arial", 12, "bold"), width=21,
                                          command=self.start_download)
-        self.button_download.grid(row=8, column=0, padx=5, pady=1, sticky='w')
+        self.button_download.grid(row=10, rowspan=1, column=0, padx=5, pady=1, sticky='nw')
         # 5. button for close
-        self.button_close = tk.Button(self.root, text="Close window", width=13, command=self.close_program)
-        self.button_close.grid(row=14, column=1, padx=15, pady=1, sticky='ne')
+        self.button_close = tk.Button(self.root, text="Close Window", fg="#D50000", 
+                                      font=("Arial", 12, "bold"), width=21, 
+                                      command=self.close_program)
+        self.button_close.grid(row=16, column=2, padx=5, pady=1, sticky='ne')
 
         # status label 1 -- number of files
         self.label_var1 = tk.StringVar()
         self.label_var1.set("-- Number of files in total.")
         self.status_label1 = tk.Label(self.root, textvariable=self.label_var1,
                                       fg="#316262", font=("Arial", 10, "bold"))
-        self.status_label1.grid(row=9, column=0, columnspan=2, padx=5, pady=1, sticky='w')
+        self.status_label1.grid(row=11, column=0, columnspan=3, padx=5, pady=1, sticky='w')
 
         # progress bar
         self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(root, variable=self.progress_var, length=480, maximum=100, style="custom.Horizontal.TProgressbar")    
-        self.progress_bar.grid(row=10, column=0, columnspan=2, padx=5, pady=1, sticky='w')
+        self.progress_bar = ttk.Progressbar(root, variable=self.progress_var, length=100, maximum=100, style="custom.Horizontal.TProgressbar")    
+        self.progress_bar.grid(row=12, column=0, columnspan=3, padx=5, pady=1, sticky='ew')
 
         # status label 3 -- download files process info
         self.label_var_process_info = tk.StringVar()
         self.label_var_process_info.set("-- Process Info.")
         self.status_label_files_process = tk.Label(self.root, textvariable=self.label_var_process_info,
                                                    fg="#316262", font=("Arial", 10, "bold"))
-        self.status_label_files_process.grid(row=11, column=0, columnspan=2, padx=5, pady=1, sticky='nw')
+        self.status_label_files_process.grid(row=13, column=0, columnspan=3, padx=5, pady=1, sticky='nw')
 
         # # status label 2 -- number of files download succeeded
         # self.label_var2 = tk.StringVar()
@@ -561,24 +714,26 @@ class FileDownloaderApp(tk.Frame):
 
         self.status_label_files_failed = tk.Label(self.root, textvariable=self.label_failed_info,
                                                   fg="#316262", font=("Arial", 10, "bold"))
-        self.status_label_files_failed.grid(row=12, column=0, columnspan=2, padx=5, pady=1, sticky='nw')
+        self.status_label_files_failed.grid(row=14, column=0, columnspan=3, padx=5, pady=1, sticky='nw')
 
         # column for Log info
         self.label_info = tk.Label(root, text="Log information↓", font=("Arial", 12, "bold"))
-        self.label_info.grid(row=14, column=0, columnspan=2, padx=5, pady=1, sticky='w')
+        self.label_info.grid(row=16, column=0, columnspan=2, padx=5, pady=1, sticky='w')
 
         # self.log_text = tk.Text(root, height=10, wrap=tk.WORD, state=tk.DISABLED)
-        self.log_text = ScrolledText(root, width=78, height=15, wrap=tk.WORD,
+        self.log_text = ScrolledText(root, width=6, height=15, wrap=tk.WORD,
                                      font=("Arial", 8, "bold"), fg="#316262", bg="lightgray")
-        self.log_text.grid(row=15, column=0, columnspan=3,  padx=5, pady=1, sticky='w')
-        # self.log_text.grid(row=12, column=1, rowspan=5, columnspan=2,  padx=5, pady=1, sticky='en')
+        self.log_text.grid(row=17, column=0, columnspan=3,  padx=5, pady=1, sticky='nesw')
+        # self.log_text.grid(row=14, column=1, rowspan=5, columnspan=2,  padx=5, pady=1, sticky='en')
 
-        self.label_auth = tk.Label(self.root, text="Initial Version, BUGs guaranteed!\t   Baicells Technologies Co.Ltd \tAuthor: Wxn 2023.7", font=("Arial", 10))
-        self.label_auth.grid(row=16, column=0, columnspan=3, padx=5, pady=1, sticky='w')
+        self.label_auth = tk.Label(self.root, text="Forked from Github-WangXN, BUGs guaranteed!   BIG BROTHER Co.Ltd    Author: Anonymous 2025.11", font=("Arial", 8))
+        self.label_auth.grid(row=18, column=0, columnspan=3, padx=5, pady=1, sticky='w')
+        # self.label_auth1 = tk.Label(self.root, text="Initial Version, BUGs guaranteed!", font=("Arial", 10))
+        # self.label_auth1.grid(row=19, column=0, columnspan=3, padx=5, pady=1, sticky='w')
 
         self.root.columnconfigure(0, minsize=15)
         self.root.columnconfigure(1, minsize=10)
-        self.root.columnconfigure(2, minsize=0)
+        self.root.columnconfigure(2, minsize=10)
 
         self.check_n_load_from_txt()
         self.fit_window_size()
@@ -588,11 +743,14 @@ class FileDownloaderApp(tk.Frame):
         self.textbox_filenames.bind("<<Modified>>", self.on_text_insert)
         self.textbox_filenames.insert("end", self.contents)
 
+        self.textbox_cmpy_names.bind("<<Modified>>", self.on_text_insert_companies)
+        
+        # Print the log during loading program
+        self.update_log( self.loading_log_text)
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = FileDownloaderApp(master=root)
     app.mainloop()
-
-
-
