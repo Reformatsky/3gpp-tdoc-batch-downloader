@@ -128,6 +128,7 @@ class FileDownloaderApp(tk.Frame):
         self.progress_per_file = 0
         # self.progress_per_file_hold_flag = False
         self.stop_event = threading.Event()
+        self.loading_log_text = ''
 
         self.read_config()
         self.layout()
@@ -595,8 +596,7 @@ class FileDownloaderApp(tk.Frame):
                     #     self.textbox_filenames.delete("1.0", tk.END)
                     #     self.textbox_filenames.insert("end", filenames)
         else:
-            t = f"No config file found."
-            self.update_log(t)
+            self.loading_log_text = f"During program loadinging: No config file found.\n\n"
 
     # layout the UI
     def layout(self):
@@ -744,6 +744,9 @@ class FileDownloaderApp(tk.Frame):
         self.textbox_filenames.insert("end", self.contents)
 
         self.textbox_cmpy_names.bind("<<Modified>>", self.on_text_insert_companies)
+        
+        # Print the log during loading program
+        self.update_log( self.loading_log_text)
 
 
 
