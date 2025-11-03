@@ -33,7 +33,7 @@ class FileDownloader(threading.Thread):
         try:
             thread_id = threading.get_ident()
             if self.use_proxy:
-                response = requests.get(self.url, proxies=self.proxies, stream=True)
+                response = requests.get(self.url, proxies=self.proxies, verify=False, stream=True)
             else:
                 response = requests.get(self.url, stream=True)
             print(f"get connection response: {response}")
@@ -52,7 +52,7 @@ class FileDownloader(threading.Thread):
                 # with open(self.save_path + self.url.split('/')[-1] , 'wb') as file:
                 with open(self.save_path, 'wb') as file:
                     if self.use_proxy:
-                        response = requests.get(self.url, proxies=self.proxies, stream=True)
+                        response = requests.get(self.url, proxies=self.proxies, verify=False, stream=True)
                     else:
                         response = requests.get(self.url, stream=True)
                     temp_percentage = 0
@@ -122,10 +122,10 @@ class FileDownloaderApp(tk.Frame):
         self.company_list = []
         self.file_urls = []
         self.save_path = ""
-        self.config_file = "app_config.ini"
+        self.config_file = "3gpp_app_config.ini"
         self.app_config = {}
         self.use_proxy = False
-        self.proxies = { 'http_proxy': '', 'https_proxy': '' }
+        self.proxies = { 'http': '', 'https': '' }
         self.downloader_list = []
         self.queue = queue.Queue()
         self.successful_downloads = []
@@ -439,8 +439,8 @@ class FileDownloaderApp(tk.Frame):
 
         # Set proxy setting
         self.use_proxy = bool( self.use_proxy_checkbox_var.get() )
-        self.proxies['http_proxy'] = self.textbox_http_proxy.get().strip()
-        self.proxies['https_proxy'] = self.textbox_https_proxy.get().strip()
+        self.proxies['http'] = self.textbox_http_proxy.get().strip()
+        self.proxies['https'] = self.textbox_https_proxy.get().strip()
         
         # URL + filename +.zip 
         self.file_urls = [f"{self.textbox_url.get()}/{filename}.zip" for filename in self.file_list]
