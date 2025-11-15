@@ -117,7 +117,8 @@ class FileDownloaderApp(tk.Frame):
         self.style.theme_use("clam")  
         self.style.configure("custom.Horizontal.TProgressbar", troughcolor="lightgray", background="green") 
 
-        self.contents = ""  
+        self.zip_file_content = ""  
+        self.title_compamy_content = ""  
         self.file_list = []
         self.company_list = []
         self.file_urls = []
@@ -158,20 +159,67 @@ class FileDownloaderApp(tk.Frame):
         self.root.update()
         self.root.resizable(0, 0)
 
-    def check_n_load_from_txt(self):
-        file_path = 'filenames.txt'
+    def check_n_load_from_txt( self, file_path = 'filenames.txt' ):
+        # file_path = 'filenames.txt'
         if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
-                self.contents = file.read()
-                # Process the contents here or print them, etc.
-                print(self.contents)
-                t = f"read filenames from filenames.txt."
-                print(t)
-                self.update_log(t)
+            file_info_dict = self.extract_info_from_file( file_path )
+            # Fill in zip file names
+            self.zip_file_content = '\n'.join( file_info_dict['file'] )
+            # Fill in title + company names
+            self.title_compamy_content = '\n'.join( file_info_dict['title'] )
+            # Process the contents here or print them, etc.
+            print(self.zip_file_content)
+            t = f"read filenames from filenames.txt."
+            print(t)
+            self.update_log(t)
         else:
             t = f"The file 'filenames.txt' does not exist, please copy filenames from TDoc list file."
             print(t)        
             self.update_log(t)
+            
+    def extract_info_from_file( self, file_path: str ):
+        file_info = {'file': [], 'title': []}
+        with open( file_path, 'r' ) as file:
+            for line in file:
+                line = line.strip()
+                # Skip empty lines and comments
+                if line and not line.startswith('#'):
+                    # Extract zip file names  / titles / company names
+                    # match_rslt = re.search( r'^(R\d-\d{7})(?:[(?:\-+)#@%=\+\$;:\t ]+)?(\b[\w& (?:\w\-\w)]+\b)?(?:[(?:\-+)#@%=\+\$;:\t ]+)?([\w& (?:\w\-\w)]+)?', line )
+                    # match_rslt = re.search( r'^(R\d-\d{7})(?:(?:[(?:\-+)#@%=\+\$;:\t ]+)([\w& ]+))+', line )
+                    match_rslt = re.search( r'^(R\d-\d{7})\s*', line )
+                    # Get file name info
+                    if match_rslt:
+                        file_info['file'].append( match_rslt.group(1) )
+                    else:
+                        # No file info found, skip this line
+                        self.update_log(f"Warning: No valid info in line: {line}")
+                        continue
+                    # Extract title and company info
+                    cap_rslt = re.findall( r' *[#@%=\-\+\$;:\t]+ *((?:[\w&]|(?: \w)|(?:\-\w))+)', line[10:] )
+                    # If information is found, add to the lists
+                    if not cap_rslt:
+                        file_info['title'].append( '' )
+                    else:
+                        file_info['title'].append( '-'.join(cap_rslt) )
+                    # if match_rslt:
+                    #     match_list = match_rslt.groups()
+                    #     no_info_flag = True
+                    #     suffix = []
+                    #     for item in match_list:
+                    #         if item is None:
+                    #             pass
+                    #         elif item.find('R') == 0 and item.find('-') == 2:
+                    #             file_info['file'].append( match_rslt.group(1) )
+                    #             no_info_flag = False
+                    #         else:
+                    #             suffix.append( item.strip() )
+                    #     if no_info_flag:
+                    #         file_info['title'].append( '' )
+                    #         self.update_log(f"Warning: No valid info in line: {line}")
+                    #     # file_info['title'].append( ' - '.join(suffix) )
+                    #     file_info['title'].append( '-'.join(suffix) )
+        return file_info
 
     def update_status_files_process(self, text):
         self.label_var_process_info.set(text)
@@ -218,10 +266,10 @@ class FileDownloaderApp(tk.Frame):
             print(f"self.textbox_cmpy_names.get(): {m}")
             if l == 1 and m[0] == '':
                 l = 0
-            # text = f"-- #{l} files are selected."
-            # # print(text)
-            # self.label_var1.set(text)
-            # self.update_log(text)
+            text = f"-- #{l} files are selected."
+            # print(text)
+            self.label_var1.set(text)
+            self.update_log(text)
         self.textbox_cmpy_names.edit_modified(False)  # Reset the modified flag for text widget!
 
     def update_label(self):
@@ -417,23 +465,30 @@ class FileDownloaderApp(tk.Frame):
         self.file_list = self.textbox_filenames.get("1.0", tk.END).strip().split("\n")
         file_len= len(self.file_list)
 
-        self.company_list = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
-        for i in range(len(self.company_list)):
-                self.company_list[i] =self.company_list[i].replace(',', '').replace(' ', '').replace('.', '').replace('(', '').replace(')', '')
+        self.company_list = self.textbox_cmpy_names.get("1.0", tk.END).strip(' ').split('\n')
+        # Remove the last '\n' in the list, don't know why it is added
+        self.company_list.pop()
+        # String replacement
+        for i in range( len(self.company_list) ):
+            # self.company_list[i] = self.company_list[i].replace(',', '').replace(' ', '').replace('.', '').replace('(', '').replace(')', '')
+            self.company_list[i] = self.company_list[i].replace(', ', ' ').replace(',', ' ').replace('\t', ' ').replace('  ', ' ')
         print(self.company_list)
         # check and put company name into the save path name
         
-        m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
-        num_cmpy = len(m)
+        # m = self.textbox_cmpy_names.get("1.0", tk.END).strip(' ').split('\n')
+        num_cmpy = len(self.company_list)
         # print(f"self.textbox_cmpy_names.get(): {m}")
-        if num_cmpy == 1 and m[0] == '':
-            num_cmpy = 0
+        # if num_cmpy == 1 and m[0] == '':
+        #     num_cmpy = 0
         
-        if file_len==num_cmpy and num_cmpy!=0:
+        if file_len == num_cmpy and num_cmpy!=0:
             print(f"file_len==l, {file_len}")
-            self.file_company_list = ['']* file_len
+            self.file_company_list = [''] * file_len
             for i in range(file_len):
-                self.file_company_list[i] = f"{self.file_list[i]}-{self.company_list[i]}"
+                if bool( self.company_list[i] ):
+                    self.file_company_list[i] = f"{self.file_list[i]}-{self.company_list[i]}"
+                else:
+                    self.file_company_list[i] = self.file_list[i]
         else:
             num_cmpy = 0
 
@@ -731,12 +786,12 @@ class FileDownloaderApp(tk.Frame):
         # Bind the text insertion event to the custom function
         # self.textbox_filenames.bind("<<TextInsert>>", self.on_text_insert)
         self.textbox_filenames.bind("<<Modified>>", self.on_text_insert)
-        self.textbox_filenames.insert("end", self.contents)
-
+        self.textbox_filenames.insert("end", self.zip_file_content)
         self.textbox_cmpy_names.bind("<<Modified>>", self.on_text_insert_companies)
+        self.textbox_cmpy_names.insert("end", self.title_compamy_content)
         
         # Print the log during loading program
-        self.update_log( self.loading_log_text)
+        self.update_log( self.loading_log_text )
 
 
 
