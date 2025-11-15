@@ -117,12 +117,13 @@ class FileDownloaderApp(tk.Frame):
         self.style.theme_use("clam")  
         self.style.configure("custom.Horizontal.TProgressbar", troughcolor="lightgray", background="green") 
 
-        self.zip_file_content = ""  
-        self.title_compamy_content = ""  
+        self.zip_file_content = ''
+        self.title_compamy_content = ''
         self.file_list = []
         self.company_list = []
+        self.file_company_list=[]
         self.file_urls = []
-        self.save_path = ""
+        self.save_path = ''
         self.config_file = "3gpp_app_config.ini"
         self.app_config = {}
         self.use_proxy = False
@@ -136,6 +137,7 @@ class FileDownloaderApp(tk.Frame):
         # self.progress_per_file_hold_flag = False
         self.stop_event = threading.Event()
         self.loading_log_text = ''
+        self.current_line = ''
 
         self.read_config()
         self.layout()
@@ -196,7 +198,7 @@ class FileDownloaderApp(tk.Frame):
                         self.update_log(f"Warning: No valid info in line: {line}")
                         continue
                     # Extract title and company info
-                    cap_rslt = re.findall( r' *[#@%=\-\+\$;:\t]+ *((?:[\w&]|(?: \w)|(?:\-\w))+)', line[10:] )
+                    cap_rslt = re.findall( r' *[#@%=\-\+\$;:\t]+ *((?:[\w&.]|(?: \w)|(?:\-\w))+)', line[10:] )
                     # If information is found, add to the lists
                     if not cap_rslt:
                         file_info['title'].append( '' )
@@ -643,6 +645,22 @@ class FileDownloaderApp(tk.Frame):
         else:
             self.loading_log_text = f"During program loadinging: No config file found.\n\n"
 
+    def reset_textboxes(self):
+        self.textbox_filenames.delete("1.0", tk.END)
+        self.textbox_cmpy_names.delete("1.0", tk.END)
+        self.clean_textbox_failed_files()
+        self.clean_state()
+        self.update_log(f"Textboxes are reset.")
+        
+    def reload_textboxes_from_txt( self ):
+        # Reset current textboxes first
+        self.reset_textboxes()
+        # Load to be downloaded file info from *.txt file
+        self.check_n_load_from_txt()
+        self.textbox_filenames.insert("end", self.zip_file_content)
+        self.textbox_cmpy_names.insert("end", self.title_compamy_content)
+        self.update_log(f"Textboxes are reloaded from filenames.txt.")
+        
     # layout the UI
     def layout(self):
         # Step1. website URL label
@@ -720,6 +738,13 @@ class FileDownloaderApp(tk.Frame):
                                          font=("Arial", 12, "bold"), width=21,
                                          command=self.start_download)
         self.button_download.grid(row=10, rowspan=1, column=0, padx=5, pady=1, sticky='nw')
+        
+        # Step 4.1 button for reset file list
+        self.button_download = tk.Button(self.root, text="Reload", fg="#EBBA18",
+                                         font=("Arial", 12, "bold"), width=18,
+                                         command=self.reload_textboxes_from_txt)
+        self.button_download.grid(row=10, rowspan=1, column=1, padx=5, pady=1, sticky='nw')
+        
         # 5. button for close
         self.button_close = tk.Button(self.root, text="Close Window", fg="#D50000", 
                                       font=("Arial", 12, "bold"), width=21, 
