@@ -198,7 +198,7 @@ class FileDownloaderApp(tk.Frame):
                         self.update_log(f"Warning: No valid info in line: {line}")
                         continue
                     # Extract title and company info
-                    cap_rslt = re.findall( r' *[#@%=\-\+\$;:\t]+ *((?:[\w&.]|(?: \w)|(?:\-\w))+)', line[10:] )
+                    cap_rslt = re.findall( r' *[#@%&=\-\+\$;:\t]+ *((?:[\w&.]|(?: \w)|(?:\-\w))+)', line[10:] )
                     # If information is found, add to the lists
                     if not cap_rslt:
                         file_info['title'].append( '' )
@@ -735,7 +735,7 @@ class FileDownloaderApp(tk.Frame):
         # Step 4. button for download
         # self.button_download = tk.Button(self.root, text="Step④. Download", fg="#3B3BFF",
         self.button_download = tk.Button(self.root, text="Start Download", fg="#3B3BFF",
-                                         font=("Arial", 12, "bold"), width=21,
+                                         font=("Arial", 12, "bold"), width=20,
                                          command=self.start_download)
         self.button_download.grid(row=10, rowspan=1, column=0, padx=5, pady=1, sticky='nw')
         
@@ -746,8 +746,8 @@ class FileDownloaderApp(tk.Frame):
         self.button_download.grid(row=10, rowspan=1, column=1, padx=5, pady=1, sticky='nw')
         
         # 5. button for close
-        self.button_close = tk.Button(self.root, text="Close Window", fg="#D50000", 
-                                      font=("Arial", 12, "bold"), width=21, 
+        self.button_close = tk.Button(self.root, text="Exit", fg="#D50000", 
+                                      font=("Arial", 12, "bold"), width=20, 
                                       command=self.close_program)
         self.button_close.grid(row=16, column=2, padx=5, pady=1, sticky='ne')
 
