@@ -189,7 +189,7 @@ class FileDownloaderApp(tk.Frame):
                     # Extract zip file names  / titles / company names
                     # match_rslt = re.search( r'^(R\d-\d{7})(?:[(?:\-+)#@%=\+\$;:\t ]+)?(\b[\w& (?:\w\-\w)]+\b)?(?:[(?:\-+)#@%=\+\$;:\t ]+)?([\w& (?:\w\-\w)]+)?', line )
                     # match_rslt = re.search( r'^(R\d-\d{7})(?:(?:[(?:\-+)#@%=\+\$;:\t ]+)([\w& ]+))+', line )
-                    match_rslt = re.search( r'^(R\d-\d{7})\s*', line )
+                    match_rslt = re.search( r'^(R\d-\d{7}|RP-\d{6})\s*', line )
                     # Get file name info
                     if match_rslt:
                         file_info['file'].append( match_rslt.group(1) )
@@ -717,7 +717,7 @@ class FileDownloaderApp(tk.Frame):
         # self.textbox_filenames.insert("end", "R1-2305660"+'\n'+"R1-2305896")
 
         # still step3, company names of the files to be downloaded
-        self.textbox_cmpy_names = ScrolledText(self.root, height=8, width=20, wrap=tk.WORD, font=("Consolas", 12))
+        self.textbox_cmpy_names = ScrolledText(self.root, height=8, width=20, wrap=tk.NONE, font=("Consolas", 12))
         self.textbox_cmpy_names.grid(row=9, column=1, padx=5, pady=1, sticky='nw')
 
 
@@ -796,7 +796,7 @@ class FileDownloaderApp(tk.Frame):
         self.log_text.grid(row=17, column=0, columnspan=3,  padx=5, pady=1, sticky='nesw')
         # self.log_text.grid(row=14, column=1, rowspan=5, columnspan=2,  padx=5, pady=1, sticky='en')
 
-        self.label_auth = tk.Label(self.root, text="Forked from Github-WangXN, BUGs guaranteed!   BIG BROTHER Co.Ltd    Author: Anonymous 2025.11", font=("Arial", 8))
+        self.label_auth = tk.Label(self.root, text="Forked from Github-WangXN, BUGs guaranteed!   BIG BROTHER Co.Ltd    Author: Anonymous 2025.12", font=("Arial", 8))
         self.label_auth.grid(row=18, column=0, columnspan=3, padx=5, pady=1, sticky='w')
         # self.label_auth1 = tk.Label(self.root, text="Initial Version, BUGs guaranteed!", font=("Arial", 10))
         # self.label_auth1.grid(row=19, column=0, columnspan=3, padx=5, pady=1, sticky='w')
