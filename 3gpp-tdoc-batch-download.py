@@ -198,7 +198,7 @@ class FileDownloaderApp(tk.Frame):
                         self.update_log(f"Warning: No valid info in line: {line}")
                         continue
                     # Extract title and company info
-                    cap_rslt = re.findall( r' *[#@%&=\-\+\$;:\t]+ *((?:[\w&.]|(?: \w)|(?:\-\w))+)', line[10:] )
+                    cap_rslt = re.findall( r' *[#@%&=\-\+\$;:\t]+ *((?:[\w&.]|(?: \w)|(?:\-\w))+)', line[9:] )
                     # If information is found, add to the lists
                     if not cap_rslt:
                         file_info['title'].append( '' )
