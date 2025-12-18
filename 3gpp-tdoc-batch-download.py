@@ -181,7 +181,7 @@ class FileDownloaderApp(tk.Frame):
             
     def extract_info_from_file( self, file_path: str ):
         file_info = {'file': [], 'title': []}
-        with open( file_path, 'r' ) as file:
+        with open( file_path, mode = 'r', encoding = 'utf-8', errors = 'ignore' ) as file:
             for line in file:
                 line = line.strip()
                 # Skip empty lines and comments
