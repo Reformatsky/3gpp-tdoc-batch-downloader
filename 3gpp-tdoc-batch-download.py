@@ -252,7 +252,8 @@ class FileDownloaderApp(tk.Frame):
             # print(text)
             self.label_var1.set(text)
             self.update_log(text)
-        self.textbox_filenames.edit_modified(False)  # Reset the modified flag for text widget!
+            # Reset the modified flag for text widget after processed!
+            self.textbox_filenames.edit_modified(False)  
 
     def on_text_insert_companies(self, event):
         # the flag below is to prevent this function being called twice
@@ -263,15 +264,16 @@ class FileDownloaderApp(tk.Frame):
             # self.check_if_text_repeated("download_list")
             self.textbox_cmpy_names.see(f"{self.current_line}.0")
 
-            l = len(self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n"))
-            m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
-            print(f"self.textbox_cmpy_names.get(): {m}")
-            if l == 1 and m[0] == '':
-                l = 0
-            text = f"-- #{l} files are selected."
-            # print(text)
-            self.label_var1.set(text)
-            self.update_log(text)
+            # # The 268-276 line code is to print number of annotations (with strip). It is neither accurate nor necessary, so it is removed in version 2.0.4
+            # l = len(self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n"))
+            # m = self.textbox_cmpy_names.get("1.0", tk.END).strip().split("\n")
+            # print(f"self.textbox_cmpy_names.get(): {m}")
+            # if l == 1 and m[0] == '':
+            #     l = 0
+            # text = f"-- #{l} annotations are selected."
+            # # print(text)
+            # self.label_var1.set(text)
+            # self.update_log(text)
         self.textbox_cmpy_names.edit_modified(False)  # Reset the modified flag for text widget!
 
     def update_label(self):
@@ -566,22 +568,28 @@ class FileDownloaderApp(tk.Frame):
             self.textbox_failed_files.insert(tk.END, fail_text)
 
         elif where == "download_list":
+            dup_flag = False
             # check whether the failed filename list are repeated.
             dl_text = self.textbox_filenames.get("1.0", tk.END)
             names = dl_text.strip().split("\n")
             # Check for duplicates
             unique_names = []
-            print(len(names))
+            print( f"Number of files: {len(names)}" )
             for name in names:
                 print(f"name : {name}")
                 if name not in unique_names:
                     if name != '':
                         unique_names.append(name)
                 else:
-                    self.update_log(f"detected repeated filenames in textbox_download_list: {name}")                    
-            filenames_text = '\n'.join(unique_names)
-            self.textbox_filenames.delete("1.0", tk.END)
-            self.textbox_filenames.insert(tk.END, filenames_text)
+                    # Previous error message will disclose the program variable
+                    self.update_log(f"Detected duplicate filenames in download list: {name}. Auto-removed it.")
+                    # Set duplicate file flag
+                    dup_flag = True
+            if dup_flag:
+                # Only re-fill the textbox when there is duplicate file input
+                filenames_text = '\n'.join(unique_names)
+                self.textbox_filenames.delete("1.0", tk.END)
+                self.textbox_filenames.insert(tk.END, filenames_text)
 
 
     # !!! to improve the close button func
@@ -712,7 +720,7 @@ class FileDownloaderApp(tk.Frame):
         self.label1a.grid(row=8, column=0, columnspan=2, padx=5, pady=0, sticky='nw')
 
         # still step3, file names to be downloaded
-        self.textbox_filenames = ScrolledText(self.root, height=8, width=13, wrap=tk.WORD, font=("Consolas", 12))
+        self.textbox_filenames = ScrolledText(self.root, height=8, width=13, wrap=tk.NONE, font=("Consolas", 12))
         self.textbox_filenames.grid(row=9, column=0, padx=5, pady=1, sticky='nw')
         # self.textbox_filenames.insert("end", "R1-2305660"+'\n'+"R1-2305896")
 
@@ -796,7 +804,7 @@ class FileDownloaderApp(tk.Frame):
         self.log_text.grid(row=17, column=0, columnspan=3,  padx=5, pady=1, sticky='nesw')
         # self.log_text.grid(row=14, column=1, rowspan=5, columnspan=2,  padx=5, pady=1, sticky='en')
 
-        self.label_auth = tk.Label(self.root, text="Forked from Github-WangXN, BUGs guaranteed!   BIG BROTHER Co.Ltd    Author: Anonymous 2025.12", font=("Arial", 8))
+        self.label_auth = tk.Label(self.root, text="Forked from Github-WangXN, BUGs guaranteed!   BIG BROTHER Co.Ltd    Author: Anonymous 2026.01", font=("Arial", 8))
         self.label_auth.grid(row=18, column=0, columnspan=3, padx=5, pady=1, sticky='w')
         # self.label_auth1 = tk.Label(self.root, text="Initial Version, BUGs guaranteed!", font=("Arial", 10))
         # self.label_auth1.grid(row=19, column=0, columnspan=3, padx=5, pady=1, sticky='w')
